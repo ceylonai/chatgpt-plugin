@@ -1,0 +1,18 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "ChatGPT Plugin (CeylonAI)",
+  "name_for_model": "MySelfPluginCeylonAi",
+  "description_for_human": "Plugin for chat with me",
+  "description_for_model": "Plugin for chat with me",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "PLUGIN_HOSTNAME/openapi.json",
+    "is_user_authenticated": false
+  },
+  "logo_url": "PLUGIN_HOSTNAME/logo.png",
+  "contact_email": "info@ceylon.ai",
+  "legal_info_url": "https://ceylon.ai"
+}
