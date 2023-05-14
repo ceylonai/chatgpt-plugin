@@ -1,8 +1,6 @@
 # chatgpt-plugin
 
-Welcome to open-source template project. We've leveraged FastAPI to make developing chatbot plugins for OpenAI's GPT models a breeze. This straightforward project automatically generates OpenAPI descriptions, allowing you to focus on building interactive chat experiences.
-
-
+Forget the hassle of designing openapi.yml - our project automatically generates it for you!
 
 ## Setup 
 ![Original Link](https://github.com/openai/plugins-quickstart)
