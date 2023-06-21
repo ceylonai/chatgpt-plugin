@@ -144,7 +144,7 @@ def process_conversation(messages, function_details, function_calls, model="gpt-
         )  # get a new response from GPT where it can see the function response
         return second_response
 """
-
+Example 
 '''py
 import json
 from external_services.open_ai_func import Query, reg_functions, process_conversation
