@@ -124,10 +124,12 @@ def process_conversation(messages, function_details, function_calls, model="gpt-
         function_name = response_message["function_call"]["name"]
         fuction_to_call = available_functions[function_name]
         function_args = json.loads(response_message["function_call"]["arguments"])
-        function_response = fuction_to_call(
-            location=function_args.get("location"),
-            unit=function_args.get("unit"),
-        )
+       # Get all the arguments from the function_args dictionary
+        kwargs = {k: v for k, v in function_args.items()}
+
+        # Call the function with the arguments
+        function_response = function_to_call(**kwargs)
+
 
         # Step 4: send the info on the function call and function response to GPT
         messages.append(response_message)  # extend conversation with assistant's reply
