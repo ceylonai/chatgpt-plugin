@@ -1,7 +1,12 @@
 from typing import Any, Dict, Optional
 
+from prance import ResolvingParser
 from pydantic.fields import Undefined
 import inspect
+
+from dotenv import load_dotenv
+
+load_dotenv(".env", )
 
 
 def Query(  # noqa: N802
@@ -101,13 +106,76 @@ def reg_functions(funcs: []):
     return _functions, _function_calls
 
 
-def process_conversation(messages, function_details, function_calls, model="gpt-3.5-turbo-0613"):
-    import os
-    import json
-    import openai
-    openai.api_key = os.environ.get("OPENAI_API_KEY")
-    # Step 1: send the conversation and available functions to GPT
+def extract_api(api_schema_url):
+    parser = ResolvingParser(api_schema_url)
 
+    servers = parser.specification.get('servers', [])
+    server_url = None
+    for server in servers:
+        server_url = server["url"]
+
+    paths = parser.specification['paths']
+
+    actions = []
+    calling_data = {
+
+    }
+
+    for path, methods in paths.items():
+        # print(f'Path: {BASE_ULR}{path}')
+        for method, operation in methods.items():
+            name = operation.get("summary", "No summary provided")
+            _description = operation.get("description", "No description provided")
+
+            params = operation.get("parameters", [])
+            required = []
+            properties = {}
+            for param in params:
+                param_name = param.get("name")
+                _type = param.get("schema", {}).get("type")
+                _description = param.get("description")
+
+                if _type == "array":
+                    _type = "string"
+
+                properties[param_name] = {
+                    "type": _type,
+                    "description": _description
+                }
+                if param.get("required"):
+                    required.append(param_name)
+
+            tool_name = f"{name}_{method}".replace(" ", "_").lower()
+            func_detail = {
+                "name": tool_name,
+                "description": _description,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            }
+            actions.append(func_detail)
+
+            calling_data[tool_name] = {
+                "path": f"{server_url}{path}",
+                "method": method
+            }
+            # break
+        # break
+    return actions, calling_data
+
+
+def process_conversation(messages,
+                         function_details,
+                         function_calls,
+                         auth_func=None,
+                         model="gpt-3.5-turbo-0613"):
+    import os
+    import openai
+    import json
+    import requests
+    openai.api_key = os.environ.get("OPENAI_API_KEY")
     response = openai.ChatCompletion.create(
         model=model,
         messages=messages,
@@ -115,76 +183,52 @@ def process_conversation(messages, function_details, function_calls, model="gpt-
         function_call="auto",  # auto is default, but we'll be explicit
     )
     response_message = response["choices"][0]["message"]
-
     # Step 2: check if GPT wanted to call a function
     if response_message.get("function_call"):
         # Step 3: call the function
         # Note: the JSON response may not always be valid; be sure to handle errors
-        available_functions = function_calls
+        # available_functions = function_calls
         function_name = response_message["function_call"]["name"]
-        fuction_to_call = available_functions[function_name]
+        function_to_call = function_calls[function_name]
         function_args = json.loads(response_message["function_call"]["arguments"])
-       # Get all the arguments from the function_args dictionary
-        kwargs = {k: v for k, v in function_args.items()}
+        print(function_args, function_to_call)
 
-        # Call the function with the arguments
-        function_response = function_to_call(**kwargs)
+        # Convert params to JSON string
+        params_json = function_args
+        url = function_to_call["path"]
 
+        headers = {}
 
-        # Step 4: send the info on the function call and function response to GPT
-        messages.append(response_message)  # extend conversation with assistant's reply
-        messages.append(
-            {
-                "role": "function",
-                "name": function_name,
-                "content": function_response,
-            }
-        )  # extend conversation with function response
-        second_response = openai.ChatCompletion.create(
-            model=model,
-            messages=messages,
-        )  # get a new response from GPT where it can see the function response
-        return second_response
-"""
-Example 
-'''py
-import json
-from external_services.open_ai_func import Query, reg_functions, process_conversation
+        if auth_func:
+            headers["Authorization"] = auth_func()
+        # Send the request
+        response = requests.get(url, headers=headers, params=params_json)
 
-from dotenv import load_dotenv
-
-load_dotenv(".env")
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Do something with the response
+            print(response.json())
+        else:
+            print(f'Request failed with status code {response.status_code}')
 
 
-def get_current_weather_func_1(location: str = Query(
-    default="San Francisco",
-    description="The city and state, e.g. San Francisco, CA",
-    title="City",
-    example="San Francisco",
-    required=True,
-), unit: str = Query(
-    default="celsius",
-    description="The unit of temperature",
-    title="Unit",
-    example="celsius",
-)):
-    """Get current weather"""
-    weather_info = {
-        "location": location,
-        "temperature": "72",
-        "unit": unit,
-        "forecast": ["sunny", "windy"],
-    }
-    return json.dumps(weather_info)
+BASE_ULR = "https://<plugin>.ceylon.ai"i"
+OPEN_API_URL = f"{BASE_ULR}/openapi.json"
+
+actions, calling_data = extract_api(OPEN_API_URL)
+
+# print(json.dumps(actions, indent=4))
+# pprint(actions)
+_messages = [{"role": "user", "content": "Generate photo realistic images of people working in an office"}]
 
 
-functions, function_calls = reg_functions([get_current_weather_func_1, ])
-_messages = [{"role": "user", "content": "What's the weather like in Boston?"}]
-res = process_conversation(_messages, functions, function_calls)
+def auth_func():
+    """
+    This function should return the auth token
+    :return:
+    """
+    pass
+
+
+res = process_conversation(_messages, actions, calling_data, auth_func=auth_func)
 print(res)
-
-
-'''
-
-
-"""
